@@ -40,4 +40,25 @@
 - `data/`: original dataset files
 
 If you want, I can also add a simple `Makefile` or PowerShell script to automate setup and run steps.
+
+## Data and DVC
+
+- The dataset `data/MachineLearningRating_v3.txt` is tracked with DVC pointers. Do NOT commit DVC cache or `DVC_storage/` into Git — `.gitignore` excludes those paths.
+
+### Configure DVC remote and push data (optional)
+
+If you want your dataset uploaded to remote storage (recommended), configure a DVC remote and push the files. There's a helper script at `scripts/configure_dvc_remote.ps1` that supports common providers (S3, Azure, GCS, SSH, local).
+
+Example (PowerShell):
+
+```powershell
+# S3 example (ensure AWS env vars are set)
+.\scripts\configure_dvc_remote.ps1 -RemoteName myremote -Type s3 -URL s3://my-bucket/path
+
+# Azure example
+.\scripts\configure_dvc_remote.ps1 -RemoteName myremote -Type azure -URL azure://myaccount.blob.core.windows.net/mycontainer/path
+```
+
+The script will run `dvc status` and attempt `dvc push`. You must provide the necessary cloud credentials (via environment variables or provider-specific config). If you want me to push the data for you, provide the remote type and credentials (or let me know where to store credentials) and I can run the push.
+
 # Insurance-risk-analysis-project
