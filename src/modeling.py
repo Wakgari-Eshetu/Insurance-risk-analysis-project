@@ -2,6 +2,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, r2_score
+import numpy as np 
 
 class ModelBuilder:
     def __init__(self, X_train, X_test, y_train, y_test):
@@ -31,7 +32,7 @@ class ModelBuilder:
         results = {}
         for name, model in self.models.items():
             y_pred = model.predict(self.X_test)
-            rmse = mean_squared_error(self.y_test, y_pred, squared=False)
+            rmse = np.sqrt(mean_squared_error(self.y_test, y_pred))
             r2 = r2_score(self.y_test, y_pred)
             results[name] = {'RMSE': rmse, 'R2': r2}
         return results

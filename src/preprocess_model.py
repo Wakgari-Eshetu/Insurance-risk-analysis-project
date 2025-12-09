@@ -1,68 +1,64 @@
-# preprocess_model.py
 import pandas as pd
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.impute import SimpleImputer
 
 class ModelPreprocessing:
     def __init__(self, df):
         self.df = df.copy()
-        self.encoder = None
+    
+    # ----------------- Step 1: Clean missing / blank values -----------------
+    def clean_missing(self):
+        # Replace empty strings or spaces with NaN
+        self.df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
+        # Convert object columns that are numeric but stored as strings
+        for col in self.df.select_dtypes(include=['object']).columns:
+            try:
+                self.df[col] = pd.to_numeric(self.df[col])
+            except:
+                pass
+        return self
 
-    # ----------------- Filter claims -----------------
-    def filter_claims(self):
-        """Subset data for policies with claims (for claim severity prediction)"""
-        self.df_claims = self.df[self.df['TotalClaims'] > 0].copy()
-        return self.df_claims
+    # ----------------- Step 2: Handle missing values -----------------
+    def handle_missing(self, strategy='median'):
+        num_cols = self.df.select_dtypes(include=[np.number]).columns
+        if strategy == 'median':
+            self.df[num_cols] = self.df[num_cols].fillna(self.df[num_cols].median())
+        elif strategy == 'mean':
+            self.df[num_cols] = self.df[num_cols].fillna(self.df[num_cols].mean())
+        elif strategy == 'mode':
+            self.df[num_cols] = self.df[num_cols].fillna(self.df[num_cols].mode().iloc[0])
+        # For object columns, fill with mode
+        obj_cols = self.df.select_dtypes(include=['object']).columns
+        self.df[obj_cols] = self.df[obj_cols].fillna(self.df[obj_cols].mode().iloc[0])
+        return self
 
-    # ----------------- Handle datetime -----------------
+    def encode_features(self, categorical_features=None):
+        if categorical_features is None:
+            categorical_features = self.df.select_dtypes(include=['object', 'bool']).columns.tolist()
+        self.df = pd.get_dummies(self.df, columns=categorical_features, drop_first=True)
+        return self
+
+
+    # ----------------- Step 4: Process datetime columns -----------------
     def process_datetime(self):
-        """Convert datetime columns into numeric features (year, month, day)"""
-        datetime_cols = self.df.select_dtypes(include='datetime64[ns]').columns
+        datetime_cols = self.df.select_dtypes(include=['datetime', 'object']).columns.tolist()
         for col in datetime_cols:
-            self.df[col + '_year'] = self.df[col].dt.year
-            self.df[col + '_month'] = self.df[col].dt.month
-            self.df[col + '_day'] = self.df[col].dt.day
-            self.df.drop(columns=[col], inplace=True)
-        return self.df
+            try:
+                self.df[col] = pd.to_datetime(self.df[col])
+                # Convert to numeric timestamp
+                self.df[col] = self.df[col].astype(np.int64) // 10**9
+            except:
+                pass
+        return self
 
-    # ----------------- Encode categorical -----------------
-    def encode_features(self, categorical_features):
-        """One-hot encode categorical variables"""
-        self.encoder = OneHotEncoder(sparse_output=False, drop='first')
-        encoded = self.encoder.fit_transform(self.df[categorical_features])
-        encoded_df = pd.DataFrame(
-            encoded, 
-            columns=self.encoder.get_feature_names_out(categorical_features),
-            index=self.df.index
-        )
-        self.df = pd.concat([self.df.drop(columns=categorical_features), encoded_df], axis=1)
-        return self.df
+    # ----------------- Step 5: Filter claims -----------------
+    def filter_claims(self):
+        if 'TotalClaims' in self.df.columns:
+            self.df = self.df[self.df['TotalClaims'] > 0]
+        return self
 
-    # ----------------- Handle missing -----------------
-    def handle_missing(self, strategy='median', columns=None):
-        """Impute missing numeric features"""
-        if columns is None:
-            # Only numeric columns
-            columns = self.df.select_dtypes(include='number').columns.tolist()
-        
-        # Drop columns that are completely empty (all NaN)
-        columns = [col for col in columns if self.df[col].notna().any()]
-        if not columns:
-            print("[INFO] No numeric columns to impute.")
-            return self.df
-        
-        # Apply imputer
-        imputer = SimpleImputer(strategy=strategy)
-        self.df[columns] = pd.DataFrame(
-            imputer.fit_transform(self.df[columns]),
-            columns=columns,
-            index=self.df.index
-        )
-        return self.df
-
-    # ----------------- Train-test split -----------------
-    def train_test_split(self, target, test_size=0.3, random_state=42):
+    # ----------------- Step 6: Train/test split -----------------
+    def train_test_split(self, target='TotalClaims', test_size=0.3, random_state=42):
         X = self.df.drop(columns=[target])
         y = self.df[target]
         return train_test_split(X, y, test_size=test_size, random_state=random_state)

@@ -4,4 +4,5 @@ matplotlib
 seaborn
 import-ipynb
 jupyter
-pytest
+ pytest
+ pytest-cov
