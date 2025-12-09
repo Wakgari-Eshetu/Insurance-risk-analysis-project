@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
-from src.dataclean import DataCleaner
+import  pytest 
+from src.dataclean  import DataCleaner
 
 
 def test_fix_dtypes_and_handle_missing():
